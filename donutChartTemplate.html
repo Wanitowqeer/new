@@ -1,0 +1,179 @@
+{% block content %}
+<div class="col-md-{{chart_details.col_size|safe}}" style="margin-top: 10px;">
+    <div class="shadow-reset">
+        <div class="sparkline-hd">
+            <div class="main-spark-hd">
+                    {{chart_details.chart_name.replace(" ","_") |upper|safe}}
+                    <span> ({{chart_details.data|length}}) </span>
+            <span class="pull-right"
+            style="cursor: pointer;"
+            name="{{chart_details.chart_id}}"
+            id="{{chart_details.chart_id}}"
+            onclick="excelDownloaddonut_{{ chart_details.chart_id| safe }}_{{chart_details.chart_name.replace(' ','_') |safe}}('{{chart_details.chart_id |safe}}')"
+            >XL
+            </span></div>
+                {% if (chart_details.idKey|safe and (chart_details.show_back_icon |safe =='YES' or chart_details.chart_level |safe|int >1)) %}
+                <div class="outline-icon"  >
+                        <span id="spanIdLeft_{{ chart_details.chart_id| safe }}" 
+                        onclick="ajaxGoBackPreviousLevel({{chart_details.chart_id|safe}},{{chart_details.dashboardId |safe}},{{chart_details.chart_level |safe}},{{chart_details.chart_index |safe}},'{{chart_details.is_level_end |safe}}')">
+                            <i id="iconIdLeft_{{ chart_details.chart_id |safe}}"  class="fa fa-arrow-circle-left"
+                            style="color: #fff;"></i>
+                        </span>
+                    </div>
+                    {% endif %}
+        </div>
+        {% if chart_details.is_download_only == False %}
+        <div class="sparkline-content">
+            <div id="divChartId_{{ chart_details.chart_id| safe }}_{{ chart_details.chart_name.replace(' ','_') }}">
+        </div>
+    </div>
+    {% endif %}
+    </div>
+</div>
+
+		
+<script type="text/javascript">
+function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie != '') {
+        var cookies = document.cookie.split(';');
+        for (var i = 0; i < cookies.length; i++) {
+            var cookie = jQuery.trim(cookies[i]);
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+$.ajaxSetup({
+    beforeSend: function(xhr, settings) {
+        if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+            // Only send the token to relative URLs i.e. locally.
+            xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+        }
+    }
+});
+$(document).ready(function () {
+    
+    showOpsDonutChart_{{ chart_details.chart_id| safe }}_{{chart_details.chart_name.replace(" ","_") |safe}}();
+})
+
+function ajaxClearSelection(){
+    $.ajax({
+                type: "GET",
+                url: "/wyzbi/dashboard/ajaxclear/" ,
+                dataType: 'json',
+                success: function(msg){
+                //alert(msg.msg);
+                location.reload();
+                }
+                });
+}
+
+function ajaxGoBackPreviousLevel(chartId,dashboardId,chart_level,chart_index,is_level_end){
+                onClickDetailsBack={
+                    "chart_id":chartId,
+                    "dashboardId":dashboardId,
+                    "chart_level":chart_level,
+                    "chart_index":chart_index,
+                    "is_level_end":is_level_end
+                };
+                $.ajax({
+                type: "POST",
+                url: "/wyzbi/dashboard/ajaxBack/" ,
+                dataType: 'json',
+                data: {'onClickDetailsBack': JSON.stringify(onClickDetailsBack)},
+                success: function(msg){
+                    //alert(msg.msg);
+                location.reload();
+                }
+                });
+}
+
+function showOpsDonutChart_{{ chart_details.chart_id| safe }}_{{chart_details.chart_name.replace(" ","_") |safe}}() {
+    var chartId='divChartId_{{ chart_details.chart_id| safe }}_{{ chart_details.chart_name.replace(" ","_") |safe }}';
+    let columndetails=[]
+    let keysArray = []; 
+    chartData= {{chart_details.data | safe}}
+    chartData.forEach(element => {
+          datarow=[element.{{chart_details.dimension_label.lower() | safe}},element.{{chart_details.measures[0].measureLabel.replace(' ','_').lower() |safe}}]
+          columndetails.push(datarow)
+          keysArray.push(element.{{chart_details.dimension_label.lower() | safe}})
+      });
+    var chart_{{ chart_details.chart_id| safe }}_{{chart_details.chart_name.replace(" ","_") |safe}} = c3.generate({
+        bindto: '#'+chartId,
+        
+
+        data: {
+            columns:columndetails,
+            keys: {
+                //value: [{% for chartTypes in chart_details.measures %} {% set measure_key='measure' %}'{{chartTypes[measure_key].split('.')[1]|safe}}',{% endfor %}]
+                value: keysArray
+            },
+            type:'donut',
+            onclick: function (d) {
+                console.log(d);
+                
+                console.log(chart_{{ chart_details.chart_id| safe }}_{{chart_details.chart_name.replace(" ","_") |safe}}.categories()[d.index]);
+                onClickDetails={};
+                onClickDetails["chart_id"]='{{ chart_details.chart_id |safe }}';
+                // onClickDetails["{{ chart_details.dimension |safe }}"]=chart_{{ chart_details.chart_id| safe }}_{{chart_details.chart_name.replace(" ","_") |safe}}.categories()[d.index];
+                onClickDetails["{{ chart_details.dimension |safe }}"]=d.id;
+                onClickDetails["dashboardId"]='{{ chart_details.dashboardId |safe }}';
+                onClickDetails["chart_level"]='{{chart_details.chart_level |safe}}';
+                onClickDetails["chart_index"]='{{chart_details.chart_index |safe}}';
+                console.log(onClickDetails);
+                $.ajax({
+                type: "POST",
+                url: "/wyzbi/dashboard/ajax/" ,
+                dataType: 'json',
+                data: {'onClickDetails': JSON.stringify(onClickDetails)},
+                success: function(msg){
+                //alert(msg.msg);
+                location.reload();
+                }
+                });
+            }
+        },
+        donut: {
+            label: {
+                format: function (value, ratio, id) {
+                    return value;
+                }
+            }
+        },
+        
+    });
+    d3.selectAll('.c3-brush .extent').style('fill', 'black');
+    d3.selectAll('.c3-brush .extent').style('fill-opacity', '5.2');
+    d3.selectAll('.c3-line').style('stroke-width', '2px');
+    d3.selectAll('.c3-text').style('font-size', '12px');
+}
+function excelDownloaddonut_{{ chart_details.chart_id| safe }}_{{chart_details.chart_name.replace(" ","_") |safe}}(chart0id){
+    //console.log({{chart_details.measures|safe}})
+  //chartdetails[]={{chart_details.measures.measureLabel |safe}}
+ // console.log({{chart_details |safe}})
+ listchart=''
+ listchart=[{% for chartTypes in chart_details.measures %} {% set measure_key='measureLabel' %}'{{chartTypes[measure_key].replace(" ","_")|safe}}',{% endfor %}]
+  $.ajax({
+      type: "POST",
+      url: "/wyzbi/add_excelchart/"+chart0id ,
+      dataType: 'json',
+      data: {'donutchart_details':JSON.stringify({{ chart_details.data |safe}}),'donutchart_title':'{{chart_details.chart_name|safe}}','donutmeasurelabel': JSON.stringify(listchart),'donutdimensionlabel':'{{ chart_details.dimension_label |safe}}'},
+      success: function(msg){
+      //location.reload();
+      document.getElementById("loading").style.display = "none";
+      location.href="{{ url('get_data_excel') }}";
+
+      }
+      });
+    }
+</script>
+{% endblock %}
+
+
+
